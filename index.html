@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sagan om Gacha - Idle RPG</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=MedievalSharp&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+    <link rel="stylesheet" href="nametags.css" />
+    <script src="nametagsData.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #0f1115;
+            --panel-bg: #1c1f26;
+            --text-main: #d3d7cf;
+            --common: #a0a0a0;
+            --rare: #3498db;
+            --epic: #9b59b6;
+            --legendary: #f1c40f;
+            --gold: #f39c12;
+            --hp-green: #2ecc71;
+            --hp-red: #e74c3c;
+            --btn-bg: #2d3e50;
+            --btn-hover: #34495e;
+            --parchment: #2a251c;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: radial-gradient(circle at center, #1a1c23 0%, #000000 100%);
+            color: var(--text-main);
+            margin: 0;
+            min-height: 100vh;
+        }
+
+        h1, h2, h3 { font-family: 'Cinzel', serif; letter-spacing: 1px; margin-top: 0; }
+        
+        .gold-text { color: var(--gold); font-weight: bold; text-shadow: 0 0 5px rgba(243, 156, 18, 0.3); }
+        
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 10px;
+            border: 1px solid #333;
+            box-shadow: 0 6px 12px rgba(0,0,0,0.5);
+        }
+
+        h2 { border-bottom: 2px solid #444; padding-bottom: 10px; color: #ecf0f1; }
+
+        button.game-btn {
+            font-family: 'MedievalSharp', cursive;
+            background-color: var(--btn-bg);
+            color: white;
+            border: 1px solid #455a64;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        button.game-btn:hover:not(:disabled) { background-color: var(--btn-hover); border-color: #7f8c8d; }
+        button.game-btn:disabled { background-color: #222; border-color: #333; color: #555; cursor: not-allowed; }
+
+        .party-slot {
+            background: radial-gradient(circle, #2a2d35 0%, #111 100%);
+            border: 2px solid #444;
+            transition: all 0.2s;
+        }
+        .party-slot.selected { border-color: var(--legendary); box-shadow: 0 0 15px rgba(241, 196, 15, 0.4); }
+        .party-slot.on-mission { opacity: 0.7; filter: grayscale(50%); pointer-events: none; }
+        
+        .bar-container { background: #222; width: 100%; height: 12px; border-radius: 6px; overflow: hidden; border: 1px solid #444; }
+        .hp-bar { background: var(--hp-green); height: 100%; transition: width 0.3s; }
+        .hp-bar.low { background: var(--hp-red); }
+        .xp-bar { background: var(--rare); height: 100%; transition: width 0.3s; }
+
+        .mission-card { background: #252830; border: 1px solid #444; }
+        .active-mission { border-color: var(--epic); background: #2c2230; }
+        .timer-text { font-family: monospace; color: var(--legendary); }
+        
+        .mission-progress { background: #111; height: 8px; border-radius: 4px; overflow: hidden; }
+        .mission-progress-bar { background: var(--epic); height: 100%; transition: width 1s linear; }
+
+        .gacha-btn { background: linear-gradient(135deg, #8e44ad, #2c3e50); border: 1px solid #9b59b6; }
+        
+        .inventory-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 5px; }
+        .inventory-grid::-webkit-scrollbar { width: 6px; }
+        .inventory-grid::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+        
+        .item-card { background: linear-gradient(180deg, #3d3d3d 0%, #2b2b2b 100%); border: 1px solid #555; transition: transform 0.1s; }
+        .item-card:hover { transform: translateY(-2px); border-color: #888; }
+        
+        .rarity-common { color: var(--common); border-color: var(--common); }
+        .rarity-rare { color: var(--rare); border-color: var(--rare); background: linear-gradient(180deg, #1e3c50 0%, #15222b 100%); }
+        .rarity-epic { color: var(--epic); border-color: var(--epic); background: linear-gradient(180deg, #43224f 0%, #201226 100%); }
+        .rarity-legendary { color: var(--legendary); border-color: var(--legendary); background: linear-gradient(180deg, #5c4e12 0%, #2a2408 100%); box-shadow: 0 0 10px rgba(241, 196, 15, 0.3); }
+
+                .log { font-family: 'Courier New', monospace; background: #0a0a0a; border: 1px solid #333; }
+
+        /* Modal / Inspect Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+
+        .inspect-window {
+            width: 90%;
+            max-width: 800px;
+            height: 750px;
+            background: #1a1a1a;
+            border: 2px solid #555;
+            border-radius: 8px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 0 40px rgba(0,0,0,0.8);
+        }
+
+        .inspect-header {
+            background: linear-gradient(to right, #2c2c2c, #1a1a1a);
+            padding: 10px 20px;
+            border-bottom: 1px solid #444;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .inspect-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            gap: 20px;
+        }
+
+                .char-paper-doll {
+            width: 320px;
+            height: 480px;
+            background: url('https://www.transparenttextures.com/patterns/dark-leather.png'), #111;
+            border: 1px solid #333;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 100px;
+            border-radius: 8px;
+        }
+
+        .gear-slot-ui {
+            width: 44px;
+            height: 44px;
+            background: rgba(0,0,0,0.6);
+            border: 1px solid #444;
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            border-radius: 4px;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .gear-slot-ui:hover { border-color: var(--gold); background: rgba(243, 156, 18, 0.1); }
+        .gear-slot-ui.has-item { border-color: #888; box-shadow: inset 0 0 5px rgba(0,0,0,0.5); }
+
+        /* Left Column */
+        .slot-head      { top: 10px;  left: 10px; }
+        .slot-neck      { top: 65px;  left: 10px; }
+        .slot-shoulders { top: 120px; left: 10px; }
+        .slot-cloak     { top: 175px; left: 10px; }
+        .slot-chest     { top: 230px; left: 10px; }
+        .slot-bracers   { top: 285px; left: 10px; }
+
+        /* Right Column */
+        .slot-gloves    { top: 10px;  right: 10px; }
+        .slot-belt      { top: 65px;  right: 10px; }
+        .slot-legs      { top: 120px; right: 10px; }
+        .slot-boots     { top: 175px; right: 10px; }
+        .slot-ring1     { top: 230px; right: 10px; }
+        .slot-ring2     { top: 285px; right: 10px; }
+
+        /* Bottom Row */
+        .slot-mainhand  { bottom: 15px; left: 10px; }
+        .slot-trinket1  { bottom: 15px; left: 68px; }
+        .slot-relic     { bottom: 15px; left: 50%; transform: translateX(-50%); }
+        .slot-trinket2  { bottom: 15px; right: 68px; }
+        .slot-offhand   { bottom: 15px; right: 10px; }
+
+        /* Special */
+        .slot-bag       { top: 10px; left: 50%; transform: translateX(-50%); border-style: dashed; }
+
+
+        .inspect-tabs {
+            display: flex;
+            background: #111;
+            border-top: 1px solid #444;
+            padding: 0 10px;
+        }
+
+        .inspect-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-top: 2px solid transparent;
+            color: #777;
+            font-family: 'Cinzel', serif;
+            font-size: 0.8rem;
+        }
+
+        .inspect-tab.active {
+            color: var(--gold);
+            border-top-color: var(--gold);
+            background: #1a1a1a;
+        }
+
+        .renown-bar-bg {
+            height: 20px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 10px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .renown-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #1e3c50, #3498db);
+            transition: width 0.5s;
+        }
+
+        .renown-text {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 1px black;
+        }
+        
+        /* ADVENTURE UI */
+        .map-node { width: 50px; height: 50px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 24px; cursor: pointer; border: 2px solid #555; background: #111; transition: all 0.2s; position: relative; z-index: 10;}
+        .map-node:hover:not(.locked) { transform: scale(1.2); border-color: var(--gold); box-shadow: 0 0 15px rgba(243, 156, 18, 0.5); }
+        .map-node.locked { opacity: 0.3; filter: grayscale(100%); cursor: not-allowed; }
+        .map-node.completed { border-color: var(--hp-green); background: rgba(46, 204, 113, 0.2); }
+        .map-node.active { border-color: var(--rare); box-shadow: 0 0 15px rgba(52, 152, 219, 0.8); animation: pulse-border 2s infinite; }
+        .map-row { display: flex; justify-content: center; gap: 40px; margin-bottom: 40px; position: relative; }
+        
+        .combat-arena { display: flex; justify-content: space-between; align-items: flex-end; height: 300px; padding: 20px 50px; background: url('https://www.transparenttextures.com/patterns/dark-leather.png'), linear-gradient(180deg, #1a1a1a, #000); border-radius: 12px; border: 1px solid #333; margin-bottom: 20px;}
+        .entity-sprite { font-size: 80px; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.8)); position: relative; transition: transform 0.1s;}
+        .intent-bubble { position: absolute; top: -50px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 1px solid #555; border-radius: 8px; padding: 5px 10px; font-size: 16px; font-weight: bold; white-space: nowrap; display: flex; align-items: center; gap: 5px; box-shadow: 0 0 10px rgba(0,0,0,0.5);}
+        .shield-bubble { position: absolute; bottom: 10px; right: -20px; background: #3498db; color: white; border: 2px solid white; border-radius: 50%; width: 30px; height: 30px; display: flex; justify-content: center; align-items: center; font-size: 14px; font-weight: bold; font-family: monospace; }
+        .mana-orb { width: 20px; height: 20px; border-radius: 50%; background: #3498db; border: 1px solid #fff; box-shadow: 0 0 10px #3498db; }
+        .mana-orb.spent { background: #111; border-color: #555; box-shadow: none; }
+        
+        .pixelated {
+            image-rendering: pixelated;
+            image-rendering: -moz-crisp-edges;
+            image-rendering: crisp-edges;
+        }
+    </style>
+
+</head>
+<body>
+    <div id="root" class="w-full h-full"></div>
+
+    <script type="text/babel">
+        // --- FIREBASE SETUP ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyDdoQwT4YTpZUjjP7vPD9JDnItSovdamZU",
+            authDomain: "gandalf-dispatch.firebaseapp.com",
+            projectId: "gandalf-dispatch",
+            storageBucket: "gandalf-dispatch.firebasestorage.app",
+            messagingSenderId: "801470091592",
+            appId: "1:801470091592:web:331563209613a74ef8237d",
+            measurementId: "G-LBN0X6232S",
+            databaseURL: "https://gandalf-dispatch-default-rtdb.europe-west1.firebasedatabase.app"
+        };
+        if (!window.firebase.apps.length) window.firebase.initializeApp(firebaseConfig);
+        const db = window.firebase.database();
+        const auth = window.firebase.auth();
+
+        const { useState, useEffect, useRef } = React;
+        const IS_LOCAL_MODE = false; // Ändra till false när du vill använda Firebase igen
+
+        // --- GAME CONSTANTS ---
+        const RARITIES = {
+            COMMON: { name: 'Common', color: 'rarity-common', mult: 1 },
+            RARE: { name: 'Rare', color: 'rarity-rare', mult: 1.5 },
+            EPIC: { name: 'Epic', color: 'rarity-epic', mult: 2.5 },
+            LEGENDARY: { name: 'Legendary', color: 'rarity-legendary', mult: 5 }
+        };
+
+        const LOOT_POOLS = {
+            characters: [
+                { name: "Hobbit", rarity: RARITIES.COMMON, baseStr: 5, baseSpd: 10, hp: 50, icon: "🦶" },
+                { name: "Ork", rarity: RARITIES.COMMON, baseStr: 12, baseSpd: 5, hp: 80, icon: "👹" },
+                { name: "Dvärga-minerare", rarity: RARITIES.RARE, baseStr: 20, baseSpd: 8, hp: 120, icon: "🧔‍♂️" },
+                { name: "Skogs-alv", rarity: RARITIES.RARE, baseStr: 15, baseSpd: 25, hp: 90, icon: "🧝" },
+                { name: "Ranger", rarity: RARITIES.EPIC, baseStr: 35, baseSpd: 20, hp: 150, icon: "🗡️" },
+                { name: "Ent", rarity: RARITIES.EPIC, baseStr: 50, baseSpd: 2, hp: 400, icon: "🌳" },
+                { name: "Smaug", rarity: RARITIES.LEGENDARY, baseStr: 150, baseSpd: 40, hp: 1000, icon: "🐉" },
+                { name: "Trollkarl", rarity: RARITIES.LEGENDARY, baseStr: 100, baseSpd: 30, hp: 600, icon: "🧙‍♂️" }
+            ],
+                        gear: [
+                { name: "Träsköld", rarity: RARITIES.COMMON, power: 2, spdBonus: -1, icon: "assets/shield_1.png", slot: "offhand", isImage: true },
+                { name: "Järnsköld", rarity: RARITIES.RARE, power: 8, spdBonus: -2, icon: "assets/shield_4.png", slot: "offhand", isImage: true },
+                { name: "Mithrilsköld", rarity: RARITIES.LEGENDARY, power: 30, spdBonus: 0, icon: "assets/shield_7.png", slot: "offhand", isImage: true },
+                
+                { name: "Kortbåge", rarity: RARITIES.COMMON, power: 4, spdBonus: 2, icon: "assets/bow_1.png", slot: "mainhand", isImage: true },
+                { name: "Alvbåge", rarity: RARITIES.EPIC, power: 20, spdBonus: 10, icon: "assets/bow_5.png", slot: "mainhand", isImage: true },
+                { name: "Gyllene Båge", rarity: RARITIES.LEGENDARY, power: 40, spdBonus: 15, icon: "assets/bow_7.png", slot: "mainhand", isImage: true },
+
+                { name: "Rostigt Svärd", rarity: RARITIES.COMMON, power: 5, spdBonus: 0, icon: "assets/melee_1.png", slot: "mainhand", isImage: true },
+                { name: "Enkel Yxa", rarity: RARITIES.COMMON, power: 7, spdBonus: -2, icon: "assets/melee_3.png", slot: "mainhand", isImage: true },
+                { name: "Slö Dolk", rarity: RARITIES.COMMON, power: 3, spdBonus: 5, icon: "assets/melee_7.png", slot: "mainhand", isImage: true },
+
+                { name: "Liten Sten", rarity: RARITIES.COMMON, power: 1, spdBonus: 1, icon: "assets/trinket_1.png", slot: "trinket", isImage: true },
+                { name: "Magi-kristall", rarity: RARITIES.RARE, power: 10, spdBonus: 0, icon: "assets/trinket_5.png", slot: "trinket", isImage: true },
+                { name: "Gudarnas Öga", rarity: RARITIES.LEGENDARY, power: 50, spdBonus: 20, icon: "assets/trinket_9.png", slot: "trinket", isImage: true },
+
+                { name: "Enkel Ring", rarity: RARITIES.COMMON, power: 2, spdBonus: 2, icon: "assets/ring_1.png", slot: "ring", isImage: true },
+                { name: "Maktens Ring", rarity: RARITIES.LEGENDARY, power: 100, spdBonus: 20, icon: "assets/ring_4.png", slot: "ring", isImage: true },
+                
+                { name: "Läderbälte", rarity: RARITIES.COMMON, power: 2, spdBonus: 0, icon: "assets/belt_1.png", slot: "belt", isImage: true },
+                { name: "Mästarens Bälte", rarity: RARITIES.EPIC, power: 15, spdBonus: 5, icon: "assets/belt_4.png", slot: "belt", isImage: true },
+                
+                { name: "Sliten Mantel", rarity: RARITIES.COMMON, power: 1, spdBonus: 2, icon: "assets/cloak_1.png", slot: "cloak", isImage: true },
+                { name: "Helgonets Relik", rarity: RARITIES.LEGENDARY, power: 80, spdBonus: 5, icon: "assets/relic_9.png", slot: "relic", isImage: true }
+            ]
+
+        };
+
+        const MISSION_TIERS = [
+            { id: 1, name: "Samla ved i Fylke", diff: 10, minTime: 10, maxTime: 30, risk: 0, rotTime: 600, goldMin: 10, goldMax: 30, xp: 20, color: 'var(--common)' },
+            { id: 2, name: "Speja på Vättar", diff: 25, minTime: 30, maxTime: 90, risk: 5, rotTime: 600, goldMin: 20, goldMax: 60, xp: 50, color: 'var(--common)' },
+            { id: 3, name: "Eskortera handelsmän", diff: 60, minTime: 60, maxTime: 300, risk: 15, rotTime: 3600, goldMin: 100, goldMax: 250, xp: 150, color: 'var(--rare)' },
+            { id: 4, name: "Rensa Mörkmården", diff: 150, minTime: 300, maxTime: 900, risk: 40, rotTime: 3600, goldMin: 400, goldMax: 800, xp: 400, color: 'var(--epic)' },
+            { id: 5, name: "Erövra Moria", diff: 500, minTime: 1800, maxTime: 3600, risk: 75, rotTime: 36000, goldMin: 2000, goldMax: 5000, xp: 2000, color: 'var(--legendary)' }
+        ];
+
+                // --- CHARACTER CREATION COMPONENT ---
+        function CharacterCreation({ onComplete }) {
+            const [name, setName] = React.useState("Vandrare");
+            const [heroClass, setHeroClass] = React.useState("Warrior");
+            const [race, setRace] = React.useState("dwarf"); // 'dwarf' eller 'elf'
+            const [spriteIdx, setSpriteIdx] = React.useState(1); // 1 till 6
+            const [stats, setStats] = React.useState({ str: 6, dex: 6, con: 6, int: 6 });
+            const [points, setPoints] = React.useState(6);
+
+            const currentIcon = `assets/${race}_${spriteIdx}.png`;
+
+            const adjustStat = (stat, val) => {
+                if (val > 0 && points > 0) {
+                    setStats(s => ({ ...s, [stat]: s[stat] + 1 }));
+                    setPoints(p => p - 1);
+                } else if (val < 0 && stats[stat] > 6) {
+                    setStats(s => ({ ...s, [stat]: s[stat] - 1 }));
+                    setPoints(p => p + 1);
+                }
+            };
+
+            const finalize = () => {
+                if (points > 0) return alert("Du har poäng kvar att fördela!");
+                const maxHp = stats.con * 12 + 20;
+                const maxMana = Math.floor(stats.int / 3) + 1;
+                onComplete({
+                    name,
+                    class: heroClass,
+                    level: 1, xp: 0, xpNeeded: 100,
+                    stats,
+                    currentHp: maxHp, maxHp,
+                    mana: maxMana, maxMana,
+                    icon: currentIcon,
+                    isImage: true,
+                    equipment: {
+                        head: null, necklace: null, shoulders: null, cloak: null,
+                        chest: null, bracers: null, gloves: null, belt: null,
+                        legs: null, boots: null, ring1: null, ring2: null,
+                        trinket1: null, trinket2: null, mainhand: null, offhand: null,
+                        relic: null, bag: null
+                    }
+                });
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center p-4 bg-black/80">
+                    <div className="panel p-8 max-w-2xl w-full border-t-4 border-t-[var(--legendary)] shadow-2xl flex flex-col md:flex-row gap-8">
+                        
+                        {/* VÄNSTER SIDA: UTSEENDE */}
+                        <div className="flex-1 flex flex-col items-center justify-center bg-black/20 p-6 rounded-xl border border-[#333]">
+                            <h3 className="font-[Cinzel] text-[var(--gold)] mb-4">Välj Utseende</h3>
+                            
+                            <div className="w-48 h-48 bg-slate-800 rounded-lg border-2 border-[#444] flex items-center justify-center mb-6 shadow-inner relative overflow-hidden">
+                                <img src={currentIcon} className="w-32 h-32 pixelated object-contain" alt="Preview" />
+                            </div>
+
+                            <div className="flex flex-col gap-4 w-full">
+                                <div className="flex gap-2">
+                                    <button onClick={() => { setRace("dwarf"); setSpriteIdx(1); }} 
+                                        className={`flex-1 py-2 rounded font-bold text-xs uppercase ${race === 'dwarf' ? 'bg-[var(--gold)] text-black' : 'bg-slate-700 text-white'}`}>Dvärg</button>
+                                    <button onClick={() => { setRace("elf"); setSpriteIdx(1); }} 
+                                        className={`flex-1 py-2 rounded font-bold text-xs uppercase ${race === 'elf' ? 'bg-[var(--rare)] text-white' : 'bg-slate-700 text-white'}`}>Alv</button>
+                                </div>
+                                
+                                <div className="flex items-center justify-between bg-black/40 p-2 rounded border border-[#444]">
+                                    <button onClick={() => setSpriteIdx(s => s > 1 ? s - 1 : 6)} className="text-xl px-4 hover:text-[var(--gold)]">⟵</button>
+                                    <span className="font-[Cinzel] text-sm">Variant {spriteIdx} / 6</span>
+                                    <button onClick={() => setSpriteIdx(s => s < 6 ? s + 1 : 1)} className="text-xl px-4 hover:text-[var(--gold)]">⟶</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* HÖGER SIDA: NAMN & STATS */}
+                        <div className="flex-1">
+                            <h2 className="text-3xl font-[Cinzel] mb-6 text-white text-center md:text-left">Hjältens Data</h2>
+                            
+                            <div className="mb-4">
+                                <label className="block text-xs uppercase text-[#777] mb-1">Namn</label>
+                                <input type="text" value={name} onChange={e => setName(e.target.value)} 
+                                    className="w-full bg-[#0a0a0a] border border-[#444] p-3 rounded text-white font-[MedievalSharp]" />
+                            </div>
+
+                            <div className="mb-6">
+                                <label className="block text-xs uppercase text-[#777] mb-1">Klass</label>
+                                <select value={heroClass} onChange={e => setHeroClass(e.target.value)}
+                                    className="w-full bg-[#0a0a0a] border border-[#444] p-3 rounded text-white font-[MedievalSharp]">
+                                    <option value="Warrior">Warrior</option>
+                                    <option value="Ranger">Ranger</option>
+                                    <option value="Mage">Mage</option>
+                                    <option value="Paladin">Paladin</option>
+                                </select>
+                            </div>
+
+                            <div className="bg-black/30 p-5 rounded-lg mb-6 border border-[#333]">
+                                <div className="flex justify-between items-center mb-5 border-b border-[#444] pb-2">
+                                    <span className="font-bold text-xs uppercase text-[#aaa]">Poäng: {points}</span>
+                                </div>
+                                
+                                {Object.entries(stats).map(([s, v]) => (
+                                    <div key={s} className="flex justify-between items-center mb-4">
+                                        <span className="uppercase text-[10px] font-bold w-12 tracking-widest text-[#aaa]">{s}</span>
+                                        <div className="flex items-center gap-3">
+                                            <button onClick={() => adjustStat(s, -1)} disabled={v <= 6} className="w-8 h-8 bg-slate-800 rounded-full border border-slate-600 flex items-center justify-center">-</button>
+                                            <span className="text-xl font-bold font-[Cinzel] w-6 text-center text-[var(--gold)]">{v}</span>
+                                            <button onClick={() => adjustStat(s, 1)} disabled={points <= 0} className="w-8 h-8 bg-slate-800 rounded-full border border-slate-600 flex items-center justify-center">+</button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <button onClick={finalize} disabled={points > 0}
+                                className="game-btn w-full py-4 rounded-xl font-bold text-xl uppercase tracking-widest shadow-lg">
+                                {points > 0 ? `Fördela ${points} poäng` : "Börja Äventyret"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // --- COMPONENT ---
+
+        function GameApp() {
+            const [user, setUser] = useState(null);
+            const [data, setData] = useState(null);
+            const [serverTimeOffset, setServerTimeOffset] = useState(0);
+                        const [now, setNow] = useState(Date.now());
+            const [logs, setLogs] = useState([]);
+            
+            const [selectedSlot, setSelectedSlot] = useState(0);
+                        const [inspectOpen, setInspectOpen] = useState(false);
+            const [inspectTab, setInspectTab] = useState('character');
+            // Adventure Engine States
+            const [currentView, setCurrentView] = useState('HUB'); // 'HUB', 'MAP', 'COMBAT', 'EVENT'
+            const [advData, setAdvData] = useState(null);
+            const [combatLog, setCombatLog] = useState([]);
+
+            // Keyboard listener for 'C'
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (e.key.toLowerCase() === 'c') {
+                        setInspectOpen(prev => !prev);
+                    }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, []);
+
+            // Hjälpfunktion för tidsberäkning (Förhindrar fusk)
+
+            const getRealTime = () => Date.now() + serverTimeOffset;
+
+            useEffect(() => {
+                if (IS_LOCAL_MODE) {
+                    // MOCK AUTH: Skapa en låtsasanvändare för lokalt bruk
+                    const mockUser = { uid: 'local-dev', displayName: 'DevPlayer', email: 'dev@test.com' };
+                    setUser(mockUser);
+
+                                        // Ladda data från webbläsarens lokala minne
+                    const localData = localStorage.getItem('gacha_game_local_save');
+                    if (localData) {
+                        try {
+                            let parsed = JSON.parse(localData);
+                            // --- DATA MIGRATION & SAFETY CHECKS ---
+                            if (!parsed.inventory) parsed.inventory = { chars: [], gear: [] };
+                            if (!parsed.inventory.chars) parsed.inventory.chars = [];
+                            if (!parsed.inventory.gear) parsed.inventory.gear = [];
+                            if (!parsed.party) parsed.party = [null, null, null];
+                            if (!parsed.activeMissions) parsed.activeMissions = [];
+                            if (!parsed.boardMissions) parsed.boardMissions = [];
+                            if (!parsed.factions) parsed.factions = [
+                                { id: 'gondor', name: 'Gondor', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
+                                { id: 'rohan', name: 'Rohan', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
+                                { id: 'elves', name: 'Lothlórien', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
+                                { id: 'shire', name: 'Fylke', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' }
+                            ];
+                            if (parsed.mainHero && !parsed.mainHero.equipment) {
+                                parsed.mainHero.equipment = {
+                                    head: null, necklace: null, shoulders: null, cloak: null,
+                                    chest: null, bracers: null, gloves: null, belt: null,
+                                    legs: null, boots: null, ring1: null, ring2: null,
+                                    trinket1: null, trinket2: null, mainhand: null, offhand: null,
+                                    relic: null, bag: null
+                                };
+                            }
+                            setData(parsed);
+                        } catch(e) {
+                            console.error("Kunde inte ladda spardata", e);
+                        }
+                    } else {
+                        // Skapa start-data om inget minne finns
+                        const initChar = {
+                            id: 'char_' + Date.now(), ...LOOT_POOLS.characters[0],
+                            level: 1, xp: 0, xpNeeded: 100, currentHp: 50, maxHp: 50, equippedGearId: null
+                        };
+                                                const initData = {
+                                                    gold: 500,
+                                                    party: [initChar.id, null, null],
+                                                    inventory: { chars: [initChar], gear: [] },
+                                                    boardMissions: [],
+                                                    activeMissions: [],
+                                                    mainHero: null, // Null tvingar fram karaktärsskapandet
+                                                    factions: [
+                                                        { id: 'gondor', name: 'Gondor', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
+                                                        { id: 'rohan', name: 'Rohan', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
+                                                        { id: 'elves', name: 'Lothlórien', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
+                                                        { id: 'shire', name: 'Fylke', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' }
+                                                    ]
+                                                };
+
+
+                        setData(initData);
+                    }
+
+                    return; // Stoppa här, kör ingen Firebase-kod
+                }
+
+                // VANLIG FIREBASE-KOD (Körs bara om IS_LOCAL_MODE är false)
+                const unsubscribe = auth.onAuthStateChanged(u => {
+                    if (u) {
+                        setUser(u);
+                        db.ref('.info/serverTimeOffset').on('value', snap => setServerTimeOffset(snap.val() || 0));
+                        const dataRef = db.ref(`users/${u.uid}/gameData`);
+                        dataRef.on('value', snap => {
+                            if (snap.exists()) setData(snap.val());
+                        });
+                    } else {
+                        window.location.href = "index.html";
+                    }
+                });
+                return () => unsubscribe();
+            }, []);
+
+            // Tick-motor för UI och uppdrag (Körs varje sekund)
+            useEffect(() => {
+                if (!data) return;
+                const interval = setInterval(() => {
+                    const currentRealTime = getRealTime();
+                    setNow(currentRealTime);
+
+                    // Kolla om uppdrag är klara
+                    if (data.activeMissions) {
+                        let completed = false;
+                        let newData = JSON.parse(JSON.stringify(data)); // Deep copy
+                        
+                        for (let i = newData.activeMissions.length - 1; i >= 0; i--) {
+                            if (currentRealTime >= newData.activeMissions[i].endTime) {
+                                handleMissionComplete(newData, newData.activeMissions[i]);
+                                newData.activeMissions.splice(i, 1);
+                                completed = true;
+                            }
+                        }
+                        if (completed) updateFirebase(newData);
+                    }
+
+                    // Generera nya board-missions om listan är tom eller gamla löpt ut
+                    if (!data.boardMissions || data.boardMissions.length < 5) {
+                        generateMissions(data);
+                    } else {
+                        let expired = false;
+                        let newData = JSON.parse(JSON.stringify(data));
+                        for (let i = newData.boardMissions.length - 1; i >= 0; i--) {
+                            if (currentRealTime >= newData.boardMissions[i].expiresAt) {
+                                newData.boardMissions.splice(i, 1);
+                                expired = true;
+                            }
+                        }
+                        if(expired) {
+                            generateMissions(newData);
+                            updateFirebase(newData);
+                        }
+                    }
+
+                }, 1000);
+                return () => clearInterval(interval);
+            }, [data, serverTimeOffset]);
+
+            // --- ADVENTURE ENGINE ---
+            const ENEMIES = [
+                { id: 'mob_1', name: 'Svag Vätte', hp: 30, icon: 'assets/mob_nm_1.png', isImage: true, intents: [{type: 'attack', val: 5}, {type: 'defend', val: 2}] },
+                { id: 'mob_5', name: 'Vargryttare', hp: 45, icon: 'assets/mob_nm_5.png', isImage: true, intents: [{type: 'attack', val: 8}, {type: 'attack', val: 6}] },
+                { id: 'hard_1', name: 'Skugg-Spindel', hp: 80, icon: 'assets/mod_hard_1.png', isImage: true, intents: [{type: 'attack', val: 12}, {type: 'defend', val: 8}] },
+                { id: 'hard_8', name: 'Grott-Troll', hp: 120, icon: 'assets/mod_hard_8.png', isImage: true, intents: [{type: 'attack', val: 18}, {type: 'buff', val: 5}] },
+                { id: 'elite_1', name: 'Ork-General', hp: 250, icon: 'assets/orc_elite_1.png', isImage: true, intents: [{type: 'attack', val: 25}, {type: 'defend', val: 15}] },
+                { id: 'elite_9', name: 'Gothmog', hp: 500, icon: 'assets/orc_elite_9.png', isImage: true, intents: [{type: 'attack', val: 40}, {type: 'attack', val: 30}] }
+            ];
+
+            const startAdventure = () => {
+                if (data.mainHero.currentHp <= 0) return alert("Din hjälte måste vila!");
+                // Generera en Slay the Spire-karta (3 rader för test)
+                const map = [
+                    [{ id: 'n1', type: 'combat', enemy: ENEMIES[0], status: 'available' }, { id: 'n2', type: 'event', status: 'available' }],
+                    [{ id: 'n3', type: 'combat', enemy: ENEMIES[1], status: 'locked' }, { id: 'n4', type: 'shop', status: 'locked' }],
+                    [{ id: 'n5', type: 'elite', enemy: ENEMIES[2], status: 'locked' }]
+                ];
+                setAdvData({ map, currentRow: 0, playerMana: data.mainHero.maxMana, playerBlock: 0, currentEnemy: null, advGold: 0 });
+                setCurrentView('MAP');
+            };
+
+            const enterNode = (node, rowIndex) => {
+                if (node.status !== 'available') return;
+                
+                let newMap = [...advData.map];
+                // Lås nuvarande rad, lås upp nästa
+                newMap[rowIndex].forEach(n => n.status = (n.id === node.id) ? 'completed' : 'locked');
+                if (newMap[rowIndex + 1]) {
+                    newMap[rowIndex + 1].forEach(n => n.status = 'available');
+                }
+
+                if (node.type === 'combat' || node.type === 'elite') {
+                    const intent = node.enemy.intents[Math.floor(Math.random() * node.enemy.intents.length)];
+                    setAdvData(prev => ({
+                        ...prev, map: newMap, currentRow: rowIndex + 1,
+                        playerMana: data.mainHero.maxMana, playerBlock: 0,
+                        currentEnemy: { ...node.enemy, currentHp: node.enemy.hp, block: 0, intent }
+                    }));
+                    setCombatLog([`Strid mot ${node.enemy.name} har börjat!`]);
+                    setCurrentView('COMBAT');
+                } else if (node.type === 'event' || node.type === 'shop') {
+                    // För test: Events och Shop vinner man bara direkt just nu
+                    alert(`Du besökte en ${node.type} och hittade 50 äventyrsguld!`);
+                    setAdvData(prev => ({ ...prev, map: newMap, currentRow: rowIndex + 1, advGold: prev.advGold + 50 }));
+                    if (rowIndex + 1 >= newMap.length) completeAdventure(true);
+                }
+            };
+
+            const combatAction = (actionType) => {
+                if (advData.playerMana < 1) return;
+                
+                let newAdv = { ...advData };
+                newAdv.playerMana -= 1;
+                
+                // Bas-attacker
+                const attackDmg = 5 + Math.floor(data.mainHero.stats.str / 2);
+                const blockVal = 5 + Math.floor(data.mainHero.stats.dex / 2);
+
+                if (actionType === 'attack') {
+                    let dmg = attackDmg;
+                    if (newAdv.currentEnemy.block > 0) {
+                        const blockDmg = Math.min(newAdv.currentEnemy.block, dmg);
+                        newAdv.currentEnemy.block -= blockDmg;
+                        dmg -= blockDmg;
+                    }
+                    newAdv.currentEnemy.currentHp -= dmg;
+                    setCombatLog(prev => [`Du attackerar för ${attackDmg} skada.`, ...prev]);
+                } else if (actionType === 'defend') {
+                    newAdv.playerBlock += blockVal;
+                    setCombatLog(prev => [`Du blockerar och får ${blockVal} sköld.`, ...prev]);
+                }
+
+                setAdvData(newAdv);
+
+                if (newAdv.currentEnemy.currentHp <= 0) {
+                    alert("Du vann striden!");
+                    if (newAdv.currentRow >= newAdv.map.length) completeAdventure(true);
+                    else setCurrentView('MAP');
+                }
+            };
+
+            const endTurn = () => {
+                let newAdv = { ...advData };
+                let newHeroData = JSON.parse(JSON.stringify(data));
+                const e = newAdv.currentEnemy;
+
+                // Fiendens tur
+                if (e.intent.type === 'attack') {
+                    let dmg = e.intent.val;
+                    if (newAdv.playerBlock > 0) {
+                        const blockDmg = Math.min(newAdv.playerBlock, dmg);
+                        newAdv.playerBlock -= blockDmg;
+                        dmg -= blockDmg;
+                    }
+                    newHeroData.mainHero.currentHp -= dmg;
+                    setCombatLog(prev => [`${e.name} attackerar dig för ${e.intent.val} skada!`, ...prev]);
+                } else if (e.intent.type === 'defend') {
+                    e.block += e.intent.val;
+                    setCombatLog(prev => [`${e.name} försvarar sig och får ${e.intent.val} sköld.`, ...prev]);
+                }
+
+                // Kolla död
+                if (newHeroData.mainHero.currentHp <= 0) {
+                    newHeroData.mainHero.currentHp = 0;
+                    updateFirebase(newHeroData);
+                    alert("Din hjälte har fallit! Äventyret är över.");
+                    setCurrentView('HUB');
+                    return;
+                }
+
+                // Ny runda startar
+                newAdv.playerBlock = 0; // Shield försvinner varje runda (Slay the Spire-regel)
+                newAdv.playerMana = newHeroData.mainHero.maxMana;
+                e.intent = e.intents[Math.floor(Math.random() * e.intents.length)]; // Nytt intent
+
+                updateFirebase(newHeroData);
+                setAdvData(newAdv);
+            };
+
+            const completeAdventure = (victory) => {
+                let newHeroData = JSON.parse(JSON.stringify(data));
+                if (victory) {
+                    newHeroData.gold += 200 + (advData?.advGold || 0);
+                    newHeroData.mainHero.xp += 50;
+                    alert("Äventyret är avklarat! Du återvänder till lägret med guld och ära.");
+                }
+                updateFirebase(newHeroData);
+                setCurrentView('HUB');
+            };
+
+            // --- FUNKTIONER ---
+            const updateFirebase = (newData) => {
+                if (IS_LOCAL_MODE) {
+                    // Spara endast i webbläsarens minne
+                    localStorage.setItem('gacha_game_local_save', JSON.stringify(newData));
+                    setData(newData); // Uppdatera skärmen direkt
+                    return;
+                }
+                // Spara i riktiga Firebase
+                if(user) db.ref(`users/${user.uid}/gameData`).set(newData);
+            };
+
+            const addLog = (msg, color = '#a3a3a3') => {
+                const time = new Date().toLocaleTimeString('sv-SE', {hour12:false});
+                setLogs(prev => [{ time, msg, color }, ...prev].slice(0, 50));
+            };
+
+            const getCharStats = (char, inventoryGear) => {
+                if (!char) return null;
+                let gear = (inventoryGear || []).find(g => g.id === char.equippedGearId);
+                let levelMult = 1 + ((char.level - 1) * 0.2);
+                let pwr = Math.floor(char.baseStr * levelMult);
+                let spd = Math.floor(char.baseSpd * levelMult);
+                let mHp = Math.floor(char.hp * levelMult);
+                
+                if (gear) { pwr += gear.power; spd += gear.spdBonus; }
+                if (spd < 1) spd = 1;
+                return { power: pwr, speed: spd, maxHp: mHp, gear };
+            };
+
+            const generateMissions = (currentData = data) => {
+                let newData = currentData ? JSON.parse(JSON.stringify(currentData)) : null;
+                if (!newData) return;
+                if (!newData.boardMissions) newData.boardMissions = [];
+
+                while(newData.boardMissions.length < 5) {
+                    const roll = Math.random();
+                    let tIdx = roll > 0.95 ? 4 : roll > 0.8 ? 3 : roll > 0.5 ? 2 : roll > 0.2 ? 1 : 0;
+                    const tier = MISSION_TIERS[tIdx];
+                    const dur = Math.floor(Math.random() * (tier.maxTime - tier.minTime + 1)) + tier.minTime;
+                    
+                    newData.boardMissions.push({
+                        id: 'miss_' + getRealTime() + Math.random().toString(36).substring(7),
+                        tierId: tier.id, name: tier.name, diff: tier.diff,
+                        duration: dur, expiresAt: getRealTime() + (tier.rotTime * 1000),
+                        goldMin: tier.goldMin, goldMax: tier.goldMax,
+                        xp: tier.xp, risk: tier.risk, color: tier.color
+                    });
+                }
+                if(currentData === data) updateFirebase(newData);
+            };
+
+            const startMission = (missionId) => {
+                let newData = JSON.parse(JSON.stringify(data));
+                const charId = newData.party[selectedSlot];
+                if (!charId) return addLog("❌ Ingen karaktär vald i nuvarande plats.", "var(--hp-red)");
+                
+                const char = newData.inventory.chars.find(c => c.id === charId);
+                if (char.currentHp <= 0) return addLog("❌ Karaktären måste vila.", "var(--hp-red)");
+                if ((newData.activeMissions || []).some(m => m.charId === charId)) return addLog("❌ Karaktären är redan på ett uppdrag.", "var(--hp-red)");
+
+                const mIndex = newData.boardMissions.findIndex(m => m.id === missionId);
+                if (mIndex === -1) return;
+                const missionData = newData.boardMissions.splice(mIndex, 1)[0];
+
+                const stats = getCharStats(char, newData.inventory.gear);
+                let speedFactor = 1 - (stats.speed / (stats.speed + 100)); 
+                let actualDuration = Math.max(5, Math.floor(missionData.duration * speedFactor));
+
+                if (!newData.activeMissions) newData.activeMissions = [];
+                newData.activeMissions.push({
+                    id: missionData.id,
+                    charId: charId,
+                    startTime: getRealTime(),
+                    endTime: getRealTime() + (actualDuration * 1000),
+                    duration: actualDuration * 1000,
+                    missionData: missionData
+                });
+
+                addLog(`🚶 ${char.name} påbörjade: ${missionData.name}`, missionData.color);
+                updateFirebase(newData);
+            };
+
+            const handleMissionComplete = (newData, activeMission) => {
+                const char = newData.inventory.chars.find(c => c.id === activeMission.charId);
+                const m = activeMission.missionData;
+                const stats = getCharStats(char, newData.inventory.gear);
+
+                let successChance = 50 + ((stats.power / m.diff) * 50);
+                if (successChance > 100) successChance = 100;
+                if (successChance < 10) successChance = 10;
+
+                if ((Math.random() * 100) <= successChance) {
+                    const wonGold = Math.floor(Math.random() * (m.goldMax - m.goldMin + 1)) + m.goldMin;
+                    newData.gold += wonGold;
+                    addXp(char, m.xp, stats.maxHp);
+                    let logMsg = `🏆 LYCKAT: ${char.name} fick ${wonGold}🪙 och ${m.xp} XP.`;
+
+                    // 25% chans att uppdraget ger utrustning
+                    if (Math.random() <= 0.25) {
+                        const isMainGear = Math.random() > 0.5; // 50/50 om det är till main eller följare
+                        const possibleGears = LOOT_POOLS.gear;
+                        const template = possibleGears[Math.floor(Math.random() * possibleGears.length)];
+                        
+                        const newGear = { 
+                            id: 'gear_' + getRealTime() + Math.random().toString(36).substring(7), 
+                            ...template,
+                            equipType: isMainGear ? 'main' : 'follower'
+                        };
+                        newData.inventory.gear.push(newGear);
+                        logMsg += ` Hittade: ${newGear.name} (${isMainGear ? 'Main Hero' : 'Följare'})!`;
+                    }
+
+                    addLog(logMsg, "var(--hp-green)");
+                } else {
+                    addLog(`☠️ MISSLYCKAT: ${char.name} misslyckades.`, "var(--hp-red)");
+                    if (m.risk > 0) {
+                        const dmg = Math.floor(stats.maxHp * (m.risk / 100));
+                        char.currentHp = Math.max(0, char.currentHp - dmg);
+                        const goldLoss = Math.floor(m.goldMin * 0.2);
+                        newData.gold = Math.max(0, newData.gold - goldLoss);
+                        addLog(`🩸 Tog ${dmg} skada och tappade ${goldLoss}🪙.`, "var(--hp-red)");
+                    }
+                }
+            };
+
+            const addXp = (char, amount, maxHp) => {
+                char.xp += amount;
+                while (char.xp >= char.xpNeeded) {
+                    char.xp -= char.xpNeeded;
+                    char.level++;
+                    char.xpNeeded = Math.floor(char.xpNeeded * 1.5);
+                    char.currentHp = maxHp; 
+                    addLog(`🌟 NIVÅ UPP! ${char.name} är nu nivå ${char.level}.`, "var(--legendary)");
+                }
+            };
+
+            const rollGacha = () => {
+                if (data.gold < 100) return addLog("❌ Inte tillräckligt med guld.", "var(--hp-red)");
+                let newData = JSON.parse(JSON.stringify(data));
+                newData.gold -= 100;
+                
+                const roll = Math.random() * 100;
+                
+                // 20% CHANS ATT FÅ EN NAMETAG TILL PROFILEN!
+                if (roll <= 20) {
+                    let rarityHit = 'rarity-common';
+                    const tagRoll = Math.random() * 100;
+                    if (tagRoll > 96) rarityHit = 'rarity-legendary';
+                    else if (tagRoll > 80) rarityHit = 'rarity-epic';
+                    else if (tagRoll > 50) rarityHit = 'rarity-rare';
+                    else if (tagRoll > 20) rarityHit = 'rarity-uncommon';
+
+                                        const tags = window.AVAILABLE_NAMETAGS.filter(t => t.rarity === rarityHit && t.id !== 'none');
+                    if (tags.length > 0) {
+                        const wonTag = tags[Math.floor(Math.random() * tags.length)];
+                        const userName = user.displayName || user.email.split('@')[0];
+                        // Spara till Firebase unlocked_tags (endast om inte i local mode)
+                        if (!IS_LOCAL_MODE) {
+                            db.ref(`unlocked_tags/${userName}/${wonTag.id}`).set(true);
+                        }
+                        addLog(`✨ GACHA: Låste upp Nametag: ${wonTag.name}! (Kolla din profil)`, wonTag.rarity === 'rarity-legendary' ? 'var(--legendary)' : 'var(--epic)');
+                        updateFirebase(newData);
+                        return;
+                    }
+                }
+
+                // Annars vanlig loot (Karaktär eller Gear)
+                let rarityHit = RARITIES.COMMON;
+                if (roll > 96) rarityHit = RARITIES.LEGENDARY;
+                else if (roll > 80) rarityHit = RARITIES.EPIC;
+                else if (roll > 50) rarityHit = RARITIES.RARE;
+
+                const isChar = Math.random() > 0.5;
+                const pool = isChar ? LOOT_POOLS.characters : LOOT_POOLS.gear;
+                const possible = pool.filter(i => i.rarity === rarityHit);
+                const template = possible.length > 0 ? possible[Math.floor(Math.random() * possible.length)] : pool[0];
+
+                if (isChar) {
+                    const newChar = { id: 'char_' + getRealTime(), ...template, level: 1, xp: 0, xpNeeded: 100, currentHp: template.hp, maxHp: template.hp, equippedGearId: null };
+                    newData.inventory.chars.push(newChar);
+                    addLog(`🎁 GACHA: Karaktär ${newChar.name} (${rarityHit.name})!`, rarityHit.color);
+                } else {
+                    const isMainGear = Math.random() > 0.5;
+                    const newGear = { id: 'gear_' + getRealTime(), ...template, equipType: isMainGear ? 'main' : 'follower' };
+                    newData.inventory.gear.push(newGear);
+                    addLog(`🎁 GACHA: Artefakt ${newGear.name} (${rarityHit.name}) [${isMainGear ? 'Main' : 'Följare'}]!`, rarityHit.color);
+                }
+                updateFirebase(newData);
+            };
+
+            const assignCharToSlot = (charId) => {
+                let newData = JSON.parse(JSON.stringify(data));
+                
+                // Tvinga arrayen att alltid ha minst 3 platser innan vi ändrar
+                if (!Array.isArray(newData.party)) newData.party = [];
+                while (newData.party.length < 3) newData.party.push(null);
+
+                const existingIdx = newData.party.indexOf(charId);
+                if (existingIdx !== -1) newData.party[existingIdx] = null;
+                newData.party[selectedSlot] = charId;
+                
+                updateFirebase(newData);
+            };
+
+                                                const equipGearToChar = (gearId) => {
+                // Om inspect är öppet, utrusta mainHero
+                if (inspectOpen) {
+                    let newData = JSON.parse(JSON.stringify(data));
+                    const gear = newData.inventory.gear.find(g => g.id === gearId);
+                    if (!gear) return;
+
+                    if (gear.equipType === 'follower') {
+                        addLog("❌ Denna utrustning är endast för dina följare (Gemenskapen)!", "var(--hp-red)");
+                        return;
+                    }
+
+                    let slot = gear.slot || 'chest';
+                    
+                    // Hantera multipla slots (ringar/trinkets)
+                    if (slot === 'ring') {
+                        slot = !newData.mainHero.equipment.ring1 ? 'ring1' : 'ring2';
+                    } else if (slot === 'trinket') {
+                        slot = !newData.mainHero.equipment.trinket1 ? 'trinket1' : 'trinket2';
+                    } else if (slot === 'necklace') {
+                        slot = 'necklace';
+                    }
+
+                    newData.mainHero.equipment[slot] = gearId;
+                    addLog(`🛡️ Du utrustade ${gear.name} i ${slot}-platsen.`, "var(--rare)");
+                    updateFirebase(newData);
+                    return;
+                }
+
+
+                const charId = data.party[selectedSlot];
+                if (!charId) return addLog("Välj en plats med en karaktär först.");
+                let newData = JSON.parse(JSON.stringify(data));
+                
+                const gearToEquip = newData.inventory.gear.find(g => g.id === gearId);
+                if (gearToEquip && gearToEquip.equipType === 'main') {
+                    return addLog("❌ Denna utrustning är endast för din Huvudhjälte!", "var(--hp-red)");
+                }
+
+                const char = newData.inventory.chars.find(c => c.id === charId);
+                newData.inventory.chars.forEach(c => { if(c.equippedGearId === gearId) c.equippedGearId = null; });
+                char.equippedGearId = gearId;
+                updateFirebase(newData);
+            };
+
+
+                        const formatTime = (ms) => {
+                if (ms < 0) ms = 0;
+                const totalSec = Math.floor(ms / 1000);
+                const m = Math.floor(totalSec / 60).toString().padStart(2, '0');
+                const s = (totalSec % 60).toString().padStart(2, '0');
+                if (totalSec >= 3600) return `${Math.floor(totalSec / 3600)}h ${m}m`;
+                return `${m}:${s}`;
+            };
+
+                        const renameHero = () => {
+                const newName = prompt("Vad ska din hjälte heta?", data.mainHero.name);
+                if (newName) {
+                    let newData = JSON.parse(JSON.stringify(data));
+                    newData.mainHero.name = newName;
+                    updateFirebase(newData);
+                }
+            };
+
+            const toggleInspect = () => setInspectOpen(!inspectOpen);
+            const resetLocalData = () => {
+                if (confirm("Är du säker på att du vill radera all din sparade data? Detta går inte att ångra.")) {
+                    localStorage.removeItem('gacha_game_local_save');
+                    window.location.reload();
+                }
+            };
+
+            if (!data) return <div className="text-white text-2xl flex items-center justify-center h-screen">Laddar äventyret...</div>;
+
+
+            if (!data.mainHero) {
+                return <CharacterCreation onComplete={(hero) => {
+                    let newData = JSON.parse(JSON.stringify(data));
+                    newData.mainHero = hero;
+                    updateFirebase(newData);
+                }} />;
+            }
+
+            const heroHpPct = (data.mainHero.currentHp / data.mainHero.maxHp) * 100;
+
+            const heroXpPct = (data.mainHero.xp / data.mainHero.xpNeeded) * 100;
+
+            return (
+                <div className="flex flex-col items-center w-full p-5 max-w-7xl mx-auto">
+                    <header className="mb-5 bg-gradient-to-b from-[#2a2d35] to-[#1c1f26] p-4 rounded-xl border border-[#3a3f4a] w-full flex justify-between items-center shadow-lg">
+                        <div>
+                            <h1 className="text-2xl font-bold font-[Cinzel] m-0 leading-tight text-white">Sagan om Gacha</h1>
+                            <span className="font-[MedievalSharp] text-[#aaa]">Idle RPG - GANDALF DISPATCH</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xl">
+                            <span className="gold-text flex items-center gap-1">{data.gold} <img src="assets/coin_1.png" className="w-6 h-6 pixelated" alt="Guld" /></span>
+                            {IS_LOCAL_MODE && (
+                                <button onClick={resetLocalData} className="text-sm bg-red-900 hover:bg-red-800 text-white px-3 py-1.5 rounded ml-4 font-sans border border-red-700">
+                                    Radera Sparfil
+                                </button>
+                            )}
+                            <a href="index.html" className="text-sm bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded ml-4 font-sans">⬅ Tillbaka till Dispatch</a>
+                        </div>
+                    </header>
+
+                                        {/* MAIN HERO PROFILE SECTION */}
+                    <section className="panel w-full mb-6 p-6 border-l-4 border-l-[var(--legendary)] bg-gradient-to-r from-[#1c1f26] to-[#252830] cursor-pointer hover:brightness-110 transition-all" onClick={toggleInspect}>
+                        <div className="flex flex-col md:flex-row gap-8 items-center">
+
+                            <div className="flex flex-col items-center">
+                                <div className="w-32 h-32 rounded-full bg-slate-800 border-4 border-[var(--legendary)] flex items-center justify-center shadow-2xl mb-3 relative overflow-hidden">
+                                    {data.mainHero.isImage ? (
+                                        <img src={data.mainHero.icon} className="w-32 h-32 pixelated object-contain" alt="Hero" />
+                                    ) : (
+                                        <span className="text-6xl">👤</span>
+                                    )}
+                                    <div className="absolute -bottom-0 left-0 right-0 bg-[var(--legendary)] text-black py-0.5 text-center text-[10px] font-bold font-[Cinzel]">
+                                        NIVÅ {data.mainHero.level}
+                                    </div>
+                                </div>
+                                <button onClick={renameHero} className="text-[var(--gold)] text-sm hover:underline font-[MedievalSharp]">Ändra namn ✎</button>
+                            </div>
+
+                            <div className="flex-1 w-full text-center md:text-left">
+                                <h2 className="text-3xl font-[Cinzel] text-white mb-1">{data.mainHero.name}</h2>
+                                <p className="text-[var(--rare)] font-bold mb-4 tracking-widest uppercase text-sm">{data.mainHero.class}</p>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <div className="flex justify-between text-xs mb-1">
+                                            <span>Livskraft (HP)</span>
+                                            <span>{data.mainHero.currentHp} / {data.mainHero.maxHp}</span>
+                                        </div>
+                                        <div className="bar-container mb-3"><div className="hp-bar" style={{width: `${heroHpPct}%`}}></div></div>
+                                        
+                                        <div className="flex justify-between text-xs mb-1 text-[var(--rare)]">
+                                            <span>Erfarenhet (XP)</span>
+                                            <span>{data.mainHero.xp} / {data.mainHero.xpNeeded}</span>
+                                        </div>
+                                        <div className="bar-container"><div className="xp-bar" style={{width: `${heroXpPct}%`}}></div></div>
+                                    </div>
+
+                                    <div className="grid grid-cols-4 gap-2 text-center">
+                                        <div className="bg-black/30 p-2 rounded border border-[#444]">
+                                            <div className="text-[var(--gold)] font-bold text-lg">{data.mainHero.stats.str}</div>
+                                            <div className="text-[8px] uppercase text-[#777]">Str</div>
+                                        </div>
+                                        <div className="bg-black/30 p-2 rounded border border-[#444]">
+                                            <div className="text-[var(--rare)] font-bold text-lg">{data.mainHero.stats.dex}</div>
+                                            <div className="text-[8px] uppercase text-[#777]">Dex</div>
+                                        </div>
+                                        <div className="bg-black/30 p-2 rounded border border-[#444]">
+                                            <div className="text-[var(--hp-green)] font-bold text-lg">{data.mainHero.stats.con}</div>
+                                            <div className="text-[8px] uppercase text-[#777]">Con</div>
+                                        </div>
+                                        <div className="bg-black/30 p-2 rounded border border-[#444]">
+                                            <div className="text-[var(--epic)] font-bold text-lg">{data.mainHero.stats.int}</div>
+                                            <div className="text-[8px] uppercase text-[#777]">Int</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex flex-col gap-2 min-w-[150px]">
+                                <div className="text-center p-2 bg-blue-900/20 border border-blue-500/30 rounded">
+                                    <div className="text-blue-400 text-xs font-bold uppercase mb-1">Mana</div>
+                                    <div className="flex justify-center gap-1">
+                                        {[...Array(data.mainHero.maxMana)].map((_, i) => (
+                                            <div key={i} className={`w-3 h-3 rounded-full ${i < data.mainHero.mana ? 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]' : 'bg-slate-700'}`}></div>
+                                        ))}
+                                    </div>
+                                </div>
+                                                                <button onClick={(e) => { e.stopPropagation(); startAdventure(); }} className="game-btn px-4 py-2 rounded text-sm bg-rose-700 hover:bg-rose-600 font-bold uppercase tracking-wider shadow-[0_0_15px_rgba(225,29,72,0.5)] border-rose-500">
+                                    ⚔️ Gå på äventyr
+                                </button>
+                                <button onClick={(e) => { e.stopPropagation(); toggleInspect(); }} className="game-btn px-4 py-2 rounded text-xs">
+                                    Öppna Karaktärsblad (C)
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                    {currentView === 'HUB' && (
+                        <React.Fragment>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 w-full">
+                        
+                        {/* PARTY PANEL */}
+                        <div className="panel p-5">
+                            <h2 className="text-xl font-bold font-[Cinzel] mb-2 text-[#ecf0f1] border-b-2 border-[#444] pb-2">Brödraskapet (Aktiv Grupp)</h2>
+                            <p className="text-sm text-[#aaa] mb-4">Klicka på en plats för att välja den. Klicka sen på utrustning i ryggsäcken.</p>
+                            
+                            {[0, 1, 2].map((index) => {
+                                const charId = (data.party && data.party[index]) ? data.party[index] : null;
+                                const isSelected = selectedSlot === index;
+                                const onMission = (data.activeMissions || []).some(m => m.charId === charId);
+                                
+                                if (!charId) {
+                                    return (
+                                        <div key={index} className={`party-slot p-4 rounded-lg text-center text-[#555] mb-4 cursor-pointer ${isSelected ? 'selected' : ''}`} onClick={() => setSelectedSlot(index)}>
+                                            Tom Plats (Klicka för att välja)
+                                        </div>
+                                    );
+                                }
+
+                                const char = data.inventory.chars.find(c => c.id === charId);
+                                const stats = getCharStats(char, data.inventory.gear);
+                                const hpPct = Math.max(0, (char.currentHp / stats.maxHp) * 100);
+                                const xpPct = (char.xp / char.xpNeeded) * 100;
+
+                                return (
+                                    <div key={index} className={`party-slot p-4 rounded-lg mb-4 cursor-pointer relative ${isSelected ? 'selected' : ''} ${onMission ? 'on-mission' : ''}`} onClick={() => setSelectedSlot(index)}>
+                                        <div className="flex justify-between items-center border-b border-[#444] pb-2 mb-2">
+                                            {char.isImage ? <img src={char.icon} className="w-24 h-24 object-contain pixelated inline-block" alt={char.name} /> : <span className="text-3xl">{char.icon}</span>}
+                                            <div className="text-right">
+                                                <span className={`${char.rarity.color} font-bold font-[Cinzel] block`}>{char.name}</span>
+                                                <span className="text-[#aaa] text-sm">Lv.{char.level}</span>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="text-xs mb-1">HP: {char.currentHp} / {stats.maxHp}</div>
+                                        <div className="bar-container"><div className={`hp-bar ${hpPct < 30 ? 'low' : ''}`} style={{width: `${hpPct}%`}}></div></div>
+                                        
+                                        <div className="text-xs mt-2 mb-1">XP: {char.xp} / {char.xpNeeded}</div>
+                                        <div className="bar-container"><div className="xp-bar" style={{width: `${xpPct}%`}}></div></div>
+                                        
+                                        <div className="grid grid-cols-2 text-sm font-[MedievalSharp] text-[#bbb] mt-3 gap-1">
+                                            <div>⚔️ Pwr: {stats.power}</div>
+                                            <div>💨 Spd: {stats.speed}</div>
+                                        </div>
+                                        
+                                        <div className="mt-3 p-1.5 bg-black/50 border border-dashed border-[#777] text-xs text-center">
+                                            {stats.gear ? <span className={stats.gear.rarity.color}>{stats.gear.icon} {stats.gear.name}</span> : "Ingen utrustning"}
+                                        </div>
+                                        
+                                        {onMission && <div className="absolute inset-0 bg-black/60 flex items-center justify-center font-bold text-[var(--legendary)] rounded-lg">PÅ UPPDRAG</div>}
+                                    </div>
+                                );
+                            })}
+
+                            <div className="log flex-1 mt-4 p-3 overflow-y-auto text-xs text-slate-300 rounded shadow-inner">
+                                {logs.map((l, i) => (
+                                    <div key={i} className="border-b border-[#222] pb-1 mb-1">
+                                        <span className="text-[#555]">[{l.time}]</span> <span style={{color: l.color}}>{l.msg}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* MISSIONS PANEL */}
+                        <div className="panel p-5">
+                            <h2 className="text-xl font-bold font-[Cinzel] mb-2 text-[#ecf0f1] border-b-2 border-[#444] pb-2">Gästgivargårdens Anslagstavla</h2>
+                            
+                            <div className="mb-4">
+                                {(data.activeMissions || []).map(am => {
+                                    const char = data.inventory.chars.find(c => c.id === am.charId);
+                                    const rem = am.endTime - now;
+                                    const pct = Math.max(0, Math.min(100, 100 - ((rem / am.duration) * 100)));
+                                    return (
+                                        <div key={am.id} className="mission-card active-mission p-4 rounded-lg mb-4">
+                                            <div className="font-bold font-[Cinzel] mb-2" style={{color: am.missionData.color}}>{am.missionData.name}</div>
+                                            <div className="text-sm text-[#aaa] mb-2">Hjälte: {char.name} {char.icon}</div>
+                                            <div className="mission-progress"><div className="mission-progress-bar" style={{width: `${pct}%`}}></div></div>
+                                            <div className="timer-text text-center mt-2 text-xl">{formatTime(rem)}</div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <h3 className="text-lg font-bold border-b border-[#444] pb-2 mb-3 mt-5">Tillgängliga Uppdrag</h3>
+                            <div className="overflow-y-auto pr-2" style={{maxHeight: '800px'}}>
+                                {(data.boardMissions || []).map(bm => (
+                                    <div key={bm.id} className="mission-card p-4 rounded-lg mb-3">
+                                        <div className="font-bold font-[Cinzel] mb-2" style={{color: bm.color}}>{bm.name}</div>
+                                        <div className="text-sm text-[#aaa] mb-3">
+                                            Tid: {formatTime(bm.duration * 1000)} | Diff: {bm.diff}<br/>
+                                            Belöning: ~{bm.goldMin}-{bm.goldMax}🪙 | {bm.xp} XP<br/>
+                                            <span className={bm.risk > 20 ? 'text-[var(--hp-red)]' : 'text-[var(--hp-green)]'}>Risk: {bm.risk}% HP/Guld förlust</span><br/>
+                                            <small className="text-[#555]">Försvinner om: {formatTime(bm.expiresAt - now)}</small>
+                                        </div>
+                                        <button className="game-btn w-full py-2 rounded" onClick={() => startMission(bm.id)}>Skicka vald hjälte</button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* GACHA / INVENTORY PANEL */}
+                        <div className="panel p-5">
+                            <h2 className="text-xl font-bold font-[Cinzel] mb-2 text-[#ecf0f1] border-b-2 border-[#444] pb-2">Smaugs Skatt (Gacha)</h2>
+                            <button className="game-btn gacha-btn w-full py-3 rounded-lg font-bold text-lg mb-5 shadow-lg" onClick={rollGacha}>
+                                Dra Loot (100 🪙)
+                            </button>
+                            
+                            <h2 className="text-lg font-bold font-[Cinzel] mb-2 text-[#ecf0f1] border-b-2 border-[#444] pb-2">Ryggsäck</h2>
+                            
+                            <h3 className="text-sm text-[#bbb] mb-2 font-bold">Gemenskapen (Karaktärer)</h3>
+                            <div className="inventory-grid mb-5">
+                                {(data.inventory.chars || []).map(c => {
+                                    const inParty = data.party.includes(c.id);
+                                    return (
+                                        <div key={c.id} className={`item-card ${c.rarity.color} ${inParty ? 'ring-2 ring-white' : ''}`} onClick={() => assignCharToSlot(c.id)}>
+                                            {c.isImage ? <img src={c.icon} className="w-16 h-16 object-contain pixelated mx-auto mb-1" alt={c.name} /> : <span className="text-3xl block mb-1">{c.icon}</span>}
+                                            <b className="text-[10px] block truncate">{c.name}</b>
+                                            <small className="text-[10px] text-slate-400">Lv.{c.level}</small>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                            
+                            <h3 className="text-sm text-[#bbb] mb-2 font-bold">Artefakter (Utrustning)</h3>
+                            <div className="inventory-grid">
+                                {(data.inventory.gear || []).map(g => {
+                                    const eqChar = data.inventory.chars.find(c => c.equippedGearId === g.id);
+                                    return (
+                                        <div key={g.id} className={`item-card ${g.rarity.color}`} onClick={() => equipGearToChar(g.id)}>
+                                            {g.isImage ? <img src={g.icon} className="w-16 h-16 object-contain pixelated mx-auto mb-1" alt={g.name} /> : <span className="text-3xl block mb-1">{g.icon}</span>}
+                                            <b className="text-[10px] block truncate">{g.name}</b>
+                                            <small className="text-[9px] block font-bold mt-1 mb-1" style={{color: g.equipType === 'main' ? '#f1c40f' : '#3498db'}}>
+                                                {g.equipType === 'main' ? '👤 Main Hero' : '👥 Följare'}
+                                            </small>
+                                            <small className="text-[10px] block text-slate-400">+{g.power} Pwr</small>
+                                            {eqChar && <div className="text-[10px] text-[var(--hp-green)]">({eqChar.icon})</div>}
+                                        </div>
+                                    );
+                                })}
+                        </div>
+                        </div>
+
+                    </div>
+                    </React.Fragment>
+                    )}
+
+                    {/* --- ADVENTURE VIEWS --- */}
+                    {currentView === 'MAP' && advData && (
+                        <div className="panel w-full p-8 flex flex-col items-center justify-center min-h-[600px] bg-gradient-to-t from-[#0a0a0a] to-[#1a1a1a]">
+                            <h2 className="text-3xl text-[var(--gold)] font-[Cinzel] mb-10 border-none text-center">Äventyrets Väg</h2>
+                            
+                            <div className="flex flex-col-reverse w-full max-w-md gap-10">
+                                {advData.map.map((row, rIndex) => (
+                                    <div key={rIndex} className="map-row">
+                                        {rIndex < advData.map.length - 1 && <div className="absolute w-full h-full border-l-2 border-dashed border-[#444] top-1/2 left-1/2 -z-10"></div>}
+                                        {row.map(node => (
+                                            <div key={node.id} onClick={() => enterNode(node, rIndex)} 
+                                                className={`map-node ${node.status}`} title={node.name}>
+                                                {node.type === 'combat' ? '⚔️' : node.type === 'shop' ? <img src="assets/coin_1.png" className="w-8 h-8 pixelated mx-auto" /> : node.type === 'elite' ? '💀' : <img src="assets/treasure_1.png" className="w-8 h-8 pixelated mx-auto" />}
+                                            </div>
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                            <button onClick={() => setCurrentView('HUB')} className="mt-10 text-slate-500 hover:text-white font-[MedievalSharp] underline">Fly från äventyret (Ger upp)</button>
+                        </div>
+                    )}
+
+                    {currentView === 'COMBAT' && advData && advData.currentEnemy && (
+                        <div className="panel w-full p-8 flex flex-col bg-gradient-to-t from-[#111] to-[#222]">
+                            <div className="flex justify-between items-center mb-5">
+                                <h2 className="text-2xl font-[Cinzel] text-white border-none m-0">Strid!</h2>
+                                <span className="text-[var(--gold)] font-bold">Äventyrsguld: {advData.advGold} 🪙</span>
+                            </div>
+
+                            <div className="combat-arena">
+                                {/* SPELAREN */}
+                                <div className="flex flex-col items-center">
+                                    <div className="entity-sprite">
+                                        <img src={data.mainHero.icon || "assets/dwarf_1.png"} className="w-32 h-32 pixelated" alt="Hero" />
+                                        {advData.playerBlock > 0 && <div className="shield-bubble">{advData.playerBlock}</div>}
+                                    </div>
+                                    <div className="mt-4 w-32">
+                                        <div className="flex justify-between text-xs font-bold text-white mb-1">
+                                            <span>HP</span><span>{data.mainHero.currentHp}/{data.mainHero.maxHp}</span>
+                                        </div>
+                                        <div className="bar-container !m-0"><div className="hp-bar" style={{width: `${(data.mainHero.currentHp/data.mainHero.maxHp)*100}%`}}></div></div>
+                                    </div>
+                                </div>
+
+                                {/* FIENDEN */}
+                                <div className="flex flex-col items-center">
+                                    <div className="entity-sprite">
+                                        <div className="intent-bubble">
+                                            {advData.currentEnemy.intent.type === 'attack' ? `⚔️ ${advData.currentEnemy.intent.val}` : 
+                                             advData.currentEnemy.intent.type === 'defend' ? `🛡️ ${advData.currentEnemy.intent.val}` : '✨ Buff'}
+                                        </div>
+                                        {advData.currentEnemy.isImage ? <img src={advData.currentEnemy.icon} className="w-32 h-32 pixelated" alt={advData.currentEnemy.name} /> : advData.currentEnemy.icon}
+                                        {advData.currentEnemy.block > 0 && <div className="shield-bubble">{advData.currentEnemy.block}</div>}
+                                    </div>
+                                    <div className="mt-4 w-32">
+                                        <div className="flex justify-between text-xs font-bold text-white mb-1">
+                                            <span>{advData.currentEnemy.name}</span><span>{advData.currentEnemy.currentHp}/{advData.currentEnemy.hp}</span>
+                                        </div>
+                                        <div className="bar-container !m-0"><div className="hp-bar !bg-red-500" style={{width: `${(advData.currentEnemy.currentHp/advData.currentEnemy.hp)*100}%`}}></div></div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* UI KONTROLLER */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="flex flex-col items-center justify-center p-4 bg-black/50 border border-[#444] rounded-lg">
+                                    <span className="text-xs uppercase text-slate-400 font-bold mb-2">Din Mana</span>
+                                    <div className="flex gap-2">
+                                        {[...Array(data.mainHero.maxMana)].map((_, i) => (
+                                            <div key={i} className={`mana-orb ${i >= advData.playerMana ? 'spent' : ''}`}></div>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2 justify-center">
+                                    <button onClick={() => combatAction('attack')} disabled={advData.playerMana < 1} className="game-btn p-3 flex flex-col items-center justify-center gap-1 text-lg font-bold bg-rose-900 border-rose-700 hover:bg-rose-800 disabled:opacity-50">
+                                        <div className="flex items-center gap-3">
+                                            <img src="assets/attack.png" className="w-16 h-16 pixelated" alt="Attack" />
+                                            <span>Attackera (1 Mana)</span>
+                                        </div>
+                                        <span className="text-xs font-normal">Gör {5 + Math.floor(data.mainHero.stats.str / 2)} skada</span>
+                                    </button>
+                                    <button onClick={() => combatAction('defend')} disabled={advData.playerMana < 1} className="game-btn p-3 flex flex-col items-center justify-center gap-1 text-lg font-bold bg-blue-900 border-blue-700 hover:bg-blue-800 disabled:opacity-50">
+                                        <div className="flex items-center gap-3">
+                                            <img src="assets/defend.png" className="w-16 h-16 pixelated" alt="Defend" />
+                                            <span>Försvara (1 Mana)</span>
+                                        </div>
+                                        <span className="text-xs font-normal">Få {5 + Math.floor(data.mainHero.stats.dex / 2)} sköld</span>
+                                    </button>
+                                    <button onClick={endTurn} className="mt-2 py-2 text-sm font-bold bg-slate-700 text-white rounded hover:bg-slate-600 transition-colors uppercase tracking-widest border border-slate-500">
+                                        Avsluta tur &rarr;
+                                    </button>
+                                </div>
+
+                                <div className="bg-black/50 border border-[#444] rounded-lg p-3 overflow-y-auto h-40 text-xs font-mono text-slate-300">
+                                    {combatLog.map((log, i) => (
+                                        <div key={i} className={`mb-1 pb-1 border-b border-[#222] ${i===0 ? 'text-white font-bold' : 'opacity-70'}`}>{log}</div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {/* INSPECT MODAL / CHARACTER SHEET */}
+                    {inspectOpen && (
+                        <div className="modal-overlay" onClick={toggleInspect}>
+                            <div className="inspect-window font-sans" onClick={e => e.stopPropagation()}>
+                                <div className="inspect-header">
+                                    <h2 className="text-xl font-[Cinzel] m-0 border-none p-0">{data.mainHero.name} - {data.mainHero.class} (Lv {data.mainHero.level})</h2>
+                                    <button onClick={toggleInspect} className="text-2xl text-gray-500 hover:text-white">&times;</button>
+                                </div>
+
+                                                                <div className="inspect-content">
+                                    {inspectTab === 'character' && (
+                                        <>
+                                            <div className="flex-1 flex flex-col items-center">
+                                                <div className="char-paper-doll rounded-lg shadow-inner">
+                                                    👤
+                                                    <div className="gear-slot-ui slot-bag" title="Väska">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.bag)?.icon || '🎒'}</div>
+                                                    
+                                                    {/* Left Column */}
+                                                    <div className="gear-slot-ui slot-head" title="Huvud">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.head)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-neck" title="Hals">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.necklace)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-shoulders" title="Axlar">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.shoulders)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-cloak" title="Mantel">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.cloak)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-chest" title="Bröst">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.chest)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-bracers" title="Armskenor">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.bracers)?.icon}</div>
+
+                                                    {/* Right Column */}
+                                                    <div className="gear-slot-ui slot-gloves" title="Handskar">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.gloves)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-belt" title="Bälte">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.belt)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-legs" title="Ben">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.legs)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-boots" title="Stövlar">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.boots)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-ring1" title="Ring 1">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.ring1)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-ring2" title="Ring 2">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.ring2)?.icon}</div>
+
+                                                    {/* Bottom Row */}
+                                                    <div className="gear-slot-ui slot-mainhand" title="Huvudhand">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.mainhand)?.icon || '⚔️'}</div>
+                                                    <div className="gear-slot-ui slot-trinket1" title="Smycke 1">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.trinket1)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-relic" title="Relik">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.relic)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-trinket2" title="Smycke 2">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.trinket2)?.icon}</div>
+                                                    <div className="gear-slot-ui slot-offhand" title="Sköld/Biarea">{(data.inventory?.gear || []).find(g => g.id === data.mainHero.equipment?.offhand)?.icon || '🛡️'}</div>
+                                                </div>
+
+                                                <div className="mt-4 w-full grid grid-cols-2 gap-4">
+                                                    <div className="bg-black/40 p-3 rounded border border-[#333]">
+                                                        <h4 className="text-[var(--gold)] text-xs font-bold uppercase mb-2">Egenskaper</h4>
+                                                        <div className="text-sm space-y-1">
+                                                            <div className="flex justify-between"><span>Styrka:</span><span className="text-white">{data.mainHero.stats?.str}</span></div>
+                                                            <div className="flex justify-between"><span>Smidighet:</span><span className="text-white">{data.mainHero.stats?.dex}</span></div>
+                                                            <div className="flex justify-between"><span>Uthållighet:</span><span className="text-white">{data.mainHero.stats?.con}</span></div>
+                                                            <div className="flex justify-between"><span>Intelligens:</span><span className="text-white">{data.mainHero.stats?.int}</span></div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="bg-black/40 p-3 rounded border border-[#333]">
+                                                        <h4 className="text-[var(--rare)] text-xs font-bold uppercase mb-2">Strid</h4>
+                                                        <div className="text-sm space-y-1">
+                                                            <div className="flex justify-between"><span>Skada:</span><span className="text-white">{Math.floor((data.mainHero.stats?.str || 0) * 1.5)}</span></div>
+                                                            <div className="flex justify-between"><span>Rustning:</span><span className="text-white">{(data.mainHero.stats?.con || 0) * 10}</span></div>
+                                                            <div className="flex justify-between"><span>Kritisk:</span><span className="text-white">{Math.floor((data.mainHero.stats?.dex || 0) / 2)}%</span></div>
+                                                            <div className="flex justify-between"><span>Mana:</span><span className="text-white">{data.mainHero.mana} / {data.mainHero.maxMana}</span></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="w-64 flex flex-col gap-4">
+                                                <div className="bg-[#111] p-4 rounded-lg flex-1 border border-[#333] flex flex-col">
+                                                    <h3 className="text-sm font-bold mb-3 font-[Cinzel] flex justify-between">
+                                                        <span>Väska</span>
+                                                        <span className="text-xs text-gray-500">{(data.inventory?.gear || []).length} / 16</span>
+                                                    </h3>
+                                                    <div className="grid grid-cols-4 gap-2 overflow-y-auto pr-1">
+                                                        {(data.inventory?.gear || []).map((g, i) => (
+                                                            <div key={g.id} 
+                                                                className={`w-12 h-12 bg-black/50 border border-[#444] rounded flex items-center justify-center text-xl cursor-pointer hover:border-[var(--gold)] transition-colors ${g.rarity?.color || ''}`}
+                                                                title={`${g.name} (${g.rarity?.name || 'Common'})`}
+                                                                onClick={() => equipGearToChar(g.id)}>
+                                                                {g.icon}
+                                                            </div>
+                                                        ))}
+                                                        {[...Array(Math.max(0, 16 - (data.inventory?.gear || []).length))].map((_, i) => (
+                                                            <div key={`empty-${i}`} className="w-12 h-12 bg-black/20 border border-[#222] rounded opacity-20"></div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="bg-black/40 p-3 rounded border border-[#333] text-xs leading-relaxed italic text-gray-400">
+                                                    "En hjälte definieras inte av sina ägodelar, utan av sina gärningar... och kanske lite mithril."
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+
+                                    {inspectTab === 'renown' && (
+                                        <div className="w-full space-y-6">
+                                            <h3 className="text-xl font-[Cinzel] text-white">Anseende i Midgård</h3>
+                                            {(data.factions || []).map(f => (
+                                                <div key={f.id} className="space-y-1">
+                                                    <div className="flex justify-between items-end">
+                                                        <span className="font-bold">{f.name}</span>
+                                                        <span className="text-xs text-[var(--gold)]">{f.rank} ({f.xp} / {f.maxXp})</span>
+                                                    </div>
+                                                    <div className="renown-bar-bg">
+                                                        <div className="renown-bar-fill" style={{ width: `${(f.xp / f.maxXp) * 100}%` }}></div>
+                                                        <div className="renown-text">{f.rank}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <div className="p-4 bg-yellow-900/10 border border-yellow-700/30 rounded text-sm text-yellow-600 italic">
+                                                Genomför uppdrag och hjälp de olika folken för att öka ditt anseende och låsa upp unika belöningar.
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="inspect-tabs">
+                                    <div className={`inspect-tab ${inspectTab === 'character' ? 'active' : ''}`} onClick={() => setInspectTab('character')}>KARAKTÄR</div>
+                                    <div className={`inspect-tab ${inspectTab === 'renown' ? 'active' : ''}`} onClick={() => setInspectTab('renown')}>ANSEENDE (RENOWN)</div>
+                                    <div className="inspect-tab opacity-30 cursor-not-allowed">VALUTA</div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<GameApp />);
+    </script>
+</body>
+</html>
