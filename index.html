@@ -479,16 +479,23 @@
             const [user, setUser] = useState(null);
             const [data, setData] = useState(null);
             const [serverTimeOffset, setServerTimeOffset] = useState(0);
-                        const [now, setNow] = useState(Date.now());
+            const [now, setNow] = useState(Date.now());
             const [logs, setLogs] = useState([]);
             
             const [selectedSlot, setSelectedSlot] = useState(0);
-                        const [inspectOpen, setInspectOpen] = useState(false);
+            const [inspectOpen, setInspectOpen] = useState(false);
             const [inspectTab, setInspectTab] = useState('character');
+            
             // Adventure Engine States
             const [currentView, setCurrentView] = useState('HUB'); // 'HUB', 'MAP', 'COMBAT', 'EVENT'
             const [advData, setAdvData] = useState(null);
             const [combatLog, setCombatLog] = useState([]);
+            
+            // Auth States
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [isRegistering, setIsRegistering] = useState(false);
+            const [authError, setAuthError] = useState('');
 
             // Keyboard listener for 'C'
             useEffect(() => {
@@ -502,33 +509,17 @@
             }, []);
 
             // Hjälpfunktion för tidsberäkning (Förhindrar fusk)
-
             const getRealTime = () => Date.now() + serverTimeOffset;
 
             useEffect(() => {
                 if (IS_LOCAL_MODE) {
-                    // MOCK AUTH: Skapa en låtsasanvändare för lokalt bruk
                     const mockUser = { uid: 'local-dev', displayName: 'DevPlayer', email: 'dev@test.com' };
                     setUser(mockUser);
-
-                                        // Ladda data från webbläsarens lokala minne
                     const localData = localStorage.getItem('gacha_game_local_save');
                     if (localData) {
                         try {
                             let parsed = JSON.parse(localData);
-                            // --- DATA MIGRATION & SAFETY CHECKS ---
                             if (!parsed.inventory) parsed.inventory = { chars: [], gear: [] };
-                            if (!parsed.inventory.chars) parsed.inventory.chars = [];
-                            if (!parsed.inventory.gear) parsed.inventory.gear = [];
-                            if (!parsed.party) parsed.party = [null, null, null];
-                            if (!parsed.activeMissions) parsed.activeMissions = [];
-                            if (!parsed.boardMissions) parsed.boardMissions = [];
-                            if (!parsed.factions) parsed.factions = [
-                                { id: 'gondor', name: 'Gondor', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
-                                { id: 'rohan', name: 'Rohan', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
-                                { id: 'elves', name: 'Lothlórien', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
-                                { id: 'shire', name: 'Fylke', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' }
-                            ];
                             if (parsed.mainHero && !parsed.mainHero.equipment) {
                                 parsed.mainHero.equipment = {
                                     head: null, necklace: null, shoulders: null, cloak: null,
@@ -539,62 +530,28 @@
                                 };
                             }
                             setData(parsed);
-                        } catch(e) {
-                            console.error("Kunde inte ladda spardata", e);
-                        }
+                        } catch(e) { console.error("Kunde inte ladda spardata", e); }
                     } else {
-                        // Skapa start-data om inget minne finns
-                        const initChar = {
-                            id: 'char_' + Date.now(), ...LOOT_POOLS.characters[0],
-                            level: 1, xp: 0, xpNeeded: 100, currentHp: 50, maxHp: 50, equippedGearId: null
-                        };
-                                                const initData = {
-                                                    gold: 500,
-                                                    party: [initChar.id, null, null],
-                                                    inventory: { chars: [initChar], gear: [] },
-                                                    boardMissions: [],
-                                                    activeMissions: [],
-                                                    mainHero: null, // Null tvingar fram karaktärsskapandet
-                                                    factions: [
-                                                        { id: 'gondor', name: 'Gondor', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
-                                                        { id: 'rohan', name: 'Rohan', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
-                                                        { id: 'elves', name: 'Lothlórien', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
-                                                        { id: 'shire', name: 'Fylke', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' }
-                                                    ]
-                                                };
-
-
+                        const initChar = { id: 'char_' + Date.now(), ...LOOT_POOLS.characters[0], level: 1, xp: 0, xpNeeded: 100, currentHp: 50, maxHp: 50, equippedGearId: null };
+                        const initData = { gold: 500, party: [initChar.id, null, null], inventory: { chars: [initChar], gear: [] }, boardMissions: [], activeMissions: [], mainHero: null };
                         setData(initData);
                     }
-
-                    return; // Stoppa här, kör ingen Firebase-kod
+                    return; 
                 }
 
-                // VANLIG FIREBASE-KOD (Körs bara om IS_LOCAL_MODE är false)
-                console.log("Firebase: Startar autentisering...");
                 const unsubscribe = auth.onAuthStateChanged(u => {
                     if (u) {
-                        console.log("Firebase: Inloggad som", u.uid);
                         setUser(u);
-                        
+                        setAuthError('');
                         db.ref('.info/serverTimeOffset').on('value', snap => setServerTimeOffset(snap.val() || 0));
-                        
                         const dataRef = db.ref(`users/${u.uid}/gameData`);
-                        console.log("Firebase: Lyssnar på data på sökväg: users/" + u.uid + "/gameData");
-                        
                         dataRef.on('value', snap => {
                             if (snap.exists()) {
-                                console.log("Firebase: Data hittad!", snap.val());
                                 setData(snap.val());
                             } else {
-                                console.log("Firebase: Ingen data finns, skapar start-profil...");
-                                const initChar = {
-                                    id: 'char_' + Date.now(), ...LOOT_POOLS.characters[0],
-                                    level: 1, xp: 0, xpNeeded: 100, currentHp: 50, maxHp: 50, equippedGearId: null
-                                };
+                                const initChar = { id: 'char_' + Date.now(), ...LOOT_POOLS.characters[0], level: 1, xp: 0, xpNeeded: 100, currentHp: 50, maxHp: 50, equippedGearId: null };
                                 const initData = {
-                                    gold: 500, party: [initChar.id, null, null], inventory: { chars: [initChar], gear: [] },
-                                    boardMissions: [], activeMissions: [], mainHero: null,
+                                    gold: 500, party: [initChar.id, null, null], inventory: { chars: [initChar], gear: [] }, activeMissions: [], boardMissions: [], mainHero: null,
                                     factions: [
                                         { id: 'gondor', name: 'Gondor', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
                                         { id: 'rohan', name: 'Rohan', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
@@ -602,16 +559,13 @@
                                         { id: 'shire', name: 'Fylke', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' }
                                     ]
                                 };
-                                db.ref(`users/${u.uid}/gameData`).set(initData)
-                                    .then(() => { console.log("Firebase: Start-data sparad!"); setData(initData); })
-                                    .catch(err => console.error("Firebase ERROR vid skrivning:", err));
+                                db.ref(`users/${u.uid}/gameData`).set(initData);
+                                setData(initData);
                             }
-                        }, error => {
-                            console.error("Firebase ERROR vid läsning:", error);
                         });
                     } else {
-                        console.log("Firebase: Ingen inloggad, försöker logga in anonymt...");
-                        auth.signInAnonymously().catch(err => console.error("Firebase ERROR vid inloggning:", err));
+                        setUser(null);
+                        setData(null);
                     }
                 });
                 return () => unsubscribe();
@@ -793,6 +747,17 @@
             };
 
             // --- FUNKTIONER ---
+            const handleAuth = (e) => {
+                e.preventDefault();
+                setAuthError('');
+                if (isRegistering) {
+                    auth.createUserWithEmailAndPassword(email, password)
+                        .catch(err => setAuthError("Fel vid registrering: " + err.message));
+                } else {
+                    auth.signInWithEmailAndPassword(email, password)
+                        .catch(err => setAuthError("Fel vid inloggning: Kontrollera e-post och lösenord."));
+                }
+            };
             const updateFirebase = (newData) => {
                 if (IS_LOCAL_MODE) {
                     // Spara endast i webbläsarens minne
@@ -1068,7 +1033,31 @@
                     window.location.reload();
                 }
             };
-
+            if (!IS_LOCAL_MODE && !user) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4 bg-black/80">
+                        <div className="panel p-8 max-w-md w-full border-t-4 border-t-[var(--legendary)] shadow-2xl">
+                            <h2 className="text-3xl font-[Cinzel] mb-2 text-center text-white">Sagan om Gacha</h2>
+                            <p className="text-center text-[#aaa] mb-6 text-sm">Logga in med samma uppgifter som i Dispatch för att spela.</p>
+                            <form onSubmit={handleAuth} className="flex flex-col gap-4">
+                                <div>
+                                    <label className="block text-xs uppercase text-[#777] mb-1">E-post</label>
+                                    <input type="email" value={email} onChange={e => setEmail(e.target.value)} required className="w-full bg-[#0a0a0a] border border-[#444] p-3 rounded text-white" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs uppercase text-[#777] mb-1">Lösenord</label>
+                                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="w-full bg-[#0a0a0a] border border-[#444] p-3 rounded text-white" />
+                                </div>
+                                {authError && <div className="text-[var(--hp-red)] text-xs text-center bg-red-900/20 p-2 rounded border border-red-900">{authError}</div>}
+                                <button type="submit" className="game-btn w-full py-3 mt-2 rounded font-bold uppercase tracking-widest text-lg">{isRegistering ? "Skapa Konto" : "Logga In"}</button>
+                            </form>
+                            <div className="text-center mt-6">
+                                <button onClick={() => setIsRegistering(!isRegistering)} className="text-[var(--gold)] text-xs hover:underline">{isRegistering ? "Har du redan ett konto? Logga in här." : "Inget konto? Skapa ett här."}</button>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
             if (!data) return <div className="text-white text-2xl flex items-center justify-center h-screen">Laddar äventyret...</div>;
 
 
