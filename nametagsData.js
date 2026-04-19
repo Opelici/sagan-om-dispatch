@@ -1,0 +1,23 @@
+window.AVAILABLE_NAMETAGS = [
+    { id: 'none', name: 'Standard (Ingen effekt)', effect: '', rarity: '', icon: '' },
+    { id: 'ghost', name: 'Ghosting', effect: 'effect-ghost', rarity: 'rarity-common', icon: '●' },
+    { id: 'static', name: 'TV Static', effect: 'effect-static', rarity: 'rarity-common', icon: '●' },
+    { id: 'vampire', name: 'Vampire Bite', effect: 'effect-vampire', rarity: 'rarity-common', icon: '●' },
+    { id: 'xray', name: 'X-Ray', effect: 'effect-xray', rarity: 'rarity-common', icon: '●' },
+    { id: 'pixel', name: 'Pixelate', effect: 'effect-pixel', rarity: 'rarity-uncommon', icon: '♦' },
+    { id: 'sonar', name: 'Sonar Sweep', effect: 'effect-sonar', rarity: 'rarity-uncommon', icon: '♦' },
+    { id: 'ash', name: 'Burning Ash', effect: 'effect-ash', rarity: 'rarity-uncommon', icon: '♦' },
+    { id: 'quake', name: 'Earthquake', effect: 'effect-quake', rarity: 'rarity-uncommon', icon: '♦' },
+    { id: 'hacker', name: 'Hacker', effect: 'effect-hacker', rarity: 'rarity-rare', icon: '▲' },
+    { id: 'blood', name: 'Blood Drip', effect: 'effect-blood', rarity: 'rarity-rare', icon: '▲' },
+    { id: 'magnet', name: 'Magnet Pull', effect: 'effect-magnet', rarity: 'rarity-rare', icon: '▲' },
+    { id: 'ice', name: 'Frozen Ice', effect: 'effect-ice', rarity: 'rarity-rare', icon: '▲' },
+    { id: 'matrix', name: 'Matrix Rain', effect: 'effect-matrix', rarity: 'rarity-epic', icon: '✦' },
+    { id: 'censor', name: 'Censored', effect: 'effect-censored', rarity: 'rarity-epic', icon: '✦' },
+    { id: 'strobe', name: 'Strobe', effect: 'effect-strobe', rarity: 'rarity-epic', icon: '✦' },
+    { id: 'hypno', name: 'Hypnotic', effect: 'effect-hypno', rarity: 'rarity-epic', icon: '✦' },
+    { id: 'flicker', name: 'Neon Flicker', effect: 'effect-flicker', rarity: 'rarity-legendary', icon: '★' },
+    { id: 'sparkle', name: 'Golden Sparkle', effect: 'effect-sparkle', rarity: 'rarity-legendary', icon: '★' },
+    { id: 'warp', name: 'Warp Speed', effect: 'effect-warp', rarity: 'rarity-legendary', icon: '★' },
+    { id: 'electric', name: 'Electric Arc', effect: 'effect-electric', rarity: 'rarity-legendary', icon: '★' }
+];
