@@ -571,27 +571,30 @@
                 }
 
                 // VANLIG FIREBASE-KOD (Körs bara om IS_LOCAL_MODE är false)
+                console.log("Firebase: Startar autentisering...");
                 const unsubscribe = auth.onAuthStateChanged(u => {
                     if (u) {
+                        console.log("Firebase: Inloggad som", u.uid);
                         setUser(u);
+                        
                         db.ref('.info/serverTimeOffset').on('value', snap => setServerTimeOffset(snap.val() || 0));
+                        
                         const dataRef = db.ref(`users/${u.uid}/gameData`);
+                        console.log("Firebase: Lyssnar på data på sökväg: users/" + u.uid + "/gameData");
+                        
                         dataRef.on('value', snap => {
                             if (snap.exists()) {
+                                console.log("Firebase: Data hittad!", snap.val());
                                 setData(snap.val());
                             } else {
-                                // SKAPA STARTDATA OM ANVÄNDAREN ÄR HELT NY I FIREBASE
+                                console.log("Firebase: Ingen data finns, skapar start-profil...");
                                 const initChar = {
                                     id: 'char_' + Date.now(), ...LOOT_POOLS.characters[0],
                                     level: 1, xp: 0, xpNeeded: 100, currentHp: 50, maxHp: 50, equippedGearId: null
                                 };
                                 const initData = {
-                                    gold: 500,
-                                    party: [initChar.id, null, null],
-                                    inventory: { chars: [initChar], gear: [] },
-                                    boardMissions: [],
-                                    activeMissions: [],
-                                    mainHero: null, // Detta tvingar fram karaktärsskaparen
+                                    gold: 500, party: [initChar.id, null, null], inventory: { chars: [initChar], gear: [] },
+                                    boardMissions: [], activeMissions: [], mainHero: null,
                                     factions: [
                                         { id: 'gondor', name: 'Gondor', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
                                         { id: 'rohan', name: 'Rohan', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
@@ -599,14 +602,16 @@
                                         { id: 'shire', name: 'Fylke', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' }
                                     ]
                                 };
-                                // Spara till Firebase så att snap.exists() blir true nästa gång
-                                db.ref(`users/${u.uid}/gameData`).set(initData);
-                                setData(initData);
+                                db.ref(`users/${u.uid}/gameData`).set(initData)
+                                    .then(() => { console.log("Firebase: Start-data sparad!"); setData(initData); })
+                                    .catch(err => console.error("Firebase ERROR vid skrivning:", err));
                             }
+                        }, error => {
+                            console.error("Firebase ERROR vid läsning:", error);
                         });
                     } else {
-                        // Om ingen är inloggad, kör anonym inloggning istället för att ladda om sidan
-                        auth.signInAnonymously().catch(err => console.error("Inloggningsfel:", err));
+                        console.log("Firebase: Ingen inloggad, försöker logga in anonymt...");
+                        auth.signInAnonymously().catch(err => console.error("Firebase ERROR vid inloggning:", err));
                     }
                 });
                 return () => unsubscribe();
