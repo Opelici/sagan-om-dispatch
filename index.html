@@ -580,14 +580,18 @@
                             if (snap.exists()) {
                                 setData(snap.val());
                             } else {
-                                // Skapa startdata för helt nya spelare i Firebase
+                                // SKAPA STARTDATA OM ANVÄNDAREN ÄR HELT NY I FIREBASE
                                 const initChar = {
                                     id: 'char_' + Date.now(), ...LOOT_POOLS.characters[0],
                                     level: 1, xp: 0, xpNeeded: 100, currentHp: 50, maxHp: 50, equippedGearId: null
                                 };
                                 const initData = {
-                                    gold: 500, party: [initChar.id, null, null], inventory: { chars: [initChar], gear: [] },
-                                    boardMissions: [], activeMissions: [], mainHero: null,
+                                    gold: 500,
+                                    party: [initChar.id, null, null],
+                                    inventory: { chars: [initChar], gear: [] },
+                                    boardMissions: [],
+                                    activeMissions: [],
+                                    mainHero: null, // Detta tvingar fram karaktärsskaparen
                                     factions: [
                                         { id: 'gondor', name: 'Gondor', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
                                         { id: 'rohan', name: 'Rohan', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' },
@@ -595,15 +599,14 @@
                                         { id: 'shire', name: 'Fylke', level: 0, xp: 0, maxXp: 1000, rank: 'Neutral' }
                                     ]
                                 };
+                                // Spara till Firebase så att snap.exists() blir true nästa gång
                                 db.ref(`users/${u.uid}/gameData`).set(initData);
                                 setData(initData);
                             }
                         });
                     } else {
-                        // Logga in användaren automatiskt i bakgrunden istället för att ladda om sidan
-                        auth.signInAnonymously().catch(error => {
-                            console.error("Kunde inte logga in:", error);
-                        });
+                        // Om ingen är inloggad, kör anonym inloggning istället för att ladda om sidan
+                        auth.signInAnonymously().catch(err => console.error("Inloggningsfel:", err));
                     }
                 });
                 return () => unsubscribe();
